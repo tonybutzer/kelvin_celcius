@@ -8,6 +8,7 @@ import boto3
 import os
 import rioxarray
 import rasterio
+import argparse
 
 def _split_full_path(bucket_full_path):
     if 's3://' in bucket_full_path:
@@ -51,8 +52,6 @@ def _get_year_month(product, tif):
 
 
 
-
-
 def xr_build_cube_concat_ds(tif_list, product):
 
     start = time()
@@ -77,13 +76,6 @@ def xr_build_cube_concat_ds(tif_list, product):
 
 
 
-
-get_ipython().system(' aws s3 ls dev-et-data/in/DelawareRiverBasin/Temp/Tasavg/1950/')
-
-
-
-
-
 def create_s3_list_of_days(main_prefix, year, temperatureType):
     output_name = f'{temperatureType}_'
     the_list = []
@@ -95,16 +87,15 @@ def create_s3_list_of_days(main_prefix, year, temperatureType):
 
 
 
-def main_runner():
+def main_runner(year, temperatureType):
 
     main_bucket_prefix='s3://dev-et-data/in/DelawareRiverBasin/Temp/'
-    year='1950'
-    temperatureType = 'Tasavg'
+    #year='1950'
+    #temperatureType = 'Tasavg'
 
     tif_list = create_s3_list_of_days(main_bucket_prefix, year, temperatureType)
 
-    tif_list_pruned = tif_list[0:364:30]
-    ds = xr_build_cube_concat_ds(tif_list_pruned, temperatureType)
+    ds = xr_build_cube_concat_ds(tif_list, temperatureType)
 
     for i in range(0,ds.dims['day']):
         print(ds['Tasavg'][i]['day'])
@@ -112,11 +103,11 @@ def main_runner():
     ds = ds - 273.15 # convert data array xarray.DataSet from Kelvin to Celsius
 
     output_main_prefix='s3://dev-et-data/in/DelawareRiverBasin/TempCelsius/'
-    year='1950'
 
-    get_ipython().system('mkdir -p ./tmp')
+    path ='./tmp'
+    os.makedirs(path, exist_ok=True)
 
-    write_out_celsius_tifs(output_main_prefix, ds, year, 'Tasavg')
+    write_out_celsius_tifs(output_main_prefix, ds, year, output_name=temperatureType)
 
 
 
@@ -125,7 +116,8 @@ def write_out_celsius_tifs(main_prefix, ds, year, output_name):
     for i in range(0,(num_days - 1)):
         dayi = i+1
         day="{:03d}".format(dayi)
-        s3_file_object = main_prefix + temperatureType + '/' + str(year) +  '/' + output_name + '_' + str(year) + day + '.tif'
+        s3_file_object = main_prefix + output_name + '/' + str(year) +  '/' + output_name + '_' + str(year) + day + '.tif'
+        print(s3_file_object)
         file_object = './tmp/' + output_name + '_' + str(year) + day + '.tif'
 
         print(file_object)
@@ -135,4 +127,28 @@ def write_out_celsius_tifs(main_prefix, ds, year, output_name):
         my_template = 's3://dev-et-data/in/DelawareRiverBasin/Temp/Tasavg/1950/Tasavg_1950017.tif'
         write_GeoTif_like(my_template, np_array, file_object)
         s3_push_delete_local(file_object, s3_file_object)
+
+
+def get_parser():
+    parser = argparse.ArgumentParser(description='Run the kelvin code')
+    parser.add_argument('-y', '--year', help='specify year or Annual or all example: -y 1999 ', default='Annual', type=str)
+    parser.add_argument('-t', '--type', help='temp type ex: Tasavg , Tasmax, Tasmin'  , default='Tasmax', type=str)
+    return parser
+
+def command_line_runner():
+    parser = get_parser()
+    args = vars(parser.parse_args())
+
+    if args['year']:
+        year = args['year']
+        print("year", args['year'])
+    if args['type']:
+        tempType =  args['type']
+        print("type", args['type'])
+
+    main_runner(year, tempType)
+
+
+if __name__ == '__main__':
+    command_line_runner()
 
