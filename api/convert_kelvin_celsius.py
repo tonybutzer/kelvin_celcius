@@ -6,6 +6,8 @@ from time import time
 import xarray as xr
 import boto3
 import os
+import rioxarray
+import rasterio
 
 def _split_full_path(bucket_full_path):
     if 's3://' in bucket_full_path:
@@ -14,8 +16,6 @@ def _split_full_path(bucket_full_path):
     bucket = bucket_full_path.split('/')[0]
     bucket_filepath = '/'.join(bucket_full_path.split('/')[1:])
     return (bucket, bucket_filepath)
-
-
 
 
 def s3_push_delete_local(local_file, bucket_full_path):
@@ -97,34 +97,29 @@ def create_s3_list_of_days(main_prefix, year, temperatureType):
 
 def main_runner():
 
-main_bucket_prefix='s3://dev-et-data/in/DelawareRiverBasin/Temp/'
-year='1950'
-temperatureType = 'Tasavg'
+    main_bucket_prefix='s3://dev-et-data/in/DelawareRiverBasin/Temp/'
+    year='1950'
+    temperatureType = 'Tasavg'
 
-tif_list = create_s3_list_of_days(main_bucket_prefix, year, temperatureType)
+    tif_list = create_s3_list_of_days(main_bucket_prefix, year, temperatureType)
 
+    tif_list_pruned = tif_list[0:364:30]
+    ds = xr_build_cube_concat_ds(tif_list_pruned, temperatureType)
 
-tif_list_pruned = tif_list[0:364:30]
-ds = xr_build_cube_concat_ds(tif_list_pruned, temperatureType)
+    for i in range(0,ds.dims['day']):
+        print(ds['Tasavg'][i]['day'])
 
+    ds = ds - 273.15 # convert data array xarray.DataSet from Kelvin to Celsius
 
-for i in range(0,ds.dims['day']):
-    print(ds['Tasavg'][i]['day'])
+    output_main_prefix='s3://dev-et-data/in/DelawareRiverBasin/TempCelsius/'
+    year='1950'
 
-ds = ds - 273.15 # convert data array xarray.DataSet from Kelvin to Celsius
+    get_ipython().system('mkdir -p ./tmp')
 
-
-output_main_prefix='s3://dev-et-data/in/DelawareRiverBasin/TempCelsius/'
-year='1950'
-
-
-get_ipython().system('mkdir -p ./tmp')
-
-write_out_celsius_tifs(output_main_prefix, ds, year, 'Tasavg')
+    write_out_celsius_tifs(output_main_prefix, ds, year, 'Tasavg')
 
 
-import rioxarray
-import rasterio
+
 def write_out_celsius_tifs(main_prefix, ds, year, output_name):
     num_days=ds.dims['day']
     for i in range(0,(num_days - 1)):
