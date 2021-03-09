@@ -29,9 +29,9 @@ def return_available_memory():
     return float(available_memory)
 
 
-class Etm:
-    def __init__(self, yml_file='etm_run.yml'):
-        print('Etm instaniated', yml_file)
+class Kelvin:
+    def __init__(self, yml_file='kelvin_run.yml'):
+        print('Kelvin instaniated', yml_file)
         self.yml_file = yml_file
         self._read_yml()
         self.client = docker.from_env()
@@ -59,15 +59,14 @@ class Etm:
         return(container)
 
     def _start_etm(self, year, product):
-        unmosaicked_input=self.etm_parms['unmosaicked_input']
-        enduser_cog_output=self.etm_parms['enduser_cog_output']
     
-        cmd_opt = '-i ' + unmosaicked_input + ' -o ' + enduser_cog_output + ' -y ' + year + ' ' + product + ' dummy'
+        temperatureType=product
+        cmd_opt =  ' -y ' + year + ' -t ' + temperatureType
         print(cmd_opt)
         cmd = 'python3 api_etm.py '
         full_cmd = cmd + cmd_opt
         #print(full_cmd)
-        docker_image =  "tbutzer/etm_docker_image"
+        docker_image =  "tbutzer/kelvin"
         #print(docker_image)
         name_c = f'etmv1_{year}'
         c = self._start_container(docker_image, full_cmd, name_c)
@@ -122,8 +121,8 @@ class Etm:
                 year_to_process = year_to_process + 1
 
 
-etm=Etm()
-print(etm)
+kelvin_instance=Kelvin()
+print(kelvin_instance)
 
-etm.MAIN_etm_runner()
+kelvin_instance.MAIN_kelvin_runner()
 
