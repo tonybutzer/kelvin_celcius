@@ -2,7 +2,9 @@
 #!/usr/bin/env python
 # coding: utf-8
 
+import sys
 from time import time
+from time import sleep
 import xarray as xr
 import boto3
 import os
@@ -50,6 +52,18 @@ def _get_year_month(product, tif):
     fn=fn[-3:]
     return fn
 
+def _xr_open_rasterio_retry(s3_file_name):
+    cnt=10
+    while(cnt>0):
+        try:
+            da = xr.open_rasterio(s3_file_name)
+            return da
+        except rasterio.errors.RasterioIOError:
+                        print("Unexpected error:", sys.exc_info()[0])
+                        print('oops',cnt)
+                        print('oops',s3_file_name)
+                        cnt = cnt - 1
+                        sleep(4)
 
 
 def xr_build_cube_concat_ds(tif_list, product):
@@ -60,7 +74,7 @@ def xr_build_cube_concat_ds(tif_list, product):
     for tif in tif_list:
         tiffile = tif
         #print(tiffile)
-        da = xr.open_rasterio(tiffile)
+        da = _xr_open_rasterio_retry(tiffile)
         my_da_list.append(da)
         tnow = time()
         elapsed = tnow - start
@@ -98,7 +112,7 @@ def main_runner(year, temperatureType):
     ds = xr_build_cube_concat_ds(tif_list, temperatureType)
 
     for i in range(0,ds.dims['day']):
-        print(ds['Tasavg'][i]['day'])
+        print(ds[temperatureType][i]['day'])
 
     ds = ds - 273.15 # convert data array xarray.DataSet from Kelvin to Celsius
 
@@ -113,7 +127,7 @@ def main_runner(year, temperatureType):
 
 def write_out_celsius_tifs(main_prefix, ds, year, output_name):
     num_days=ds.dims['day']
-    for i in range(0,(num_days - 1)):
+    for i in range(0,num_days ):
         dayi = i+1
         day="{:03d}".format(dayi)
         s3_file_object = main_prefix + output_name + '/' + str(year) +  '/' + output_name + '_' + str(year) + day + '.tif'
@@ -122,7 +136,7 @@ def write_out_celsius_tifs(main_prefix, ds, year, output_name):
 
         print(file_object)
 
-        np_array = ds[output_name].isel(day=dayi).values
+        np_array = ds[output_name].isel(day=i).values
 #         print(type(np_array))
         my_template = 's3://dev-et-data/in/DelawareRiverBasin/Temp/Tasavg/1950/Tasavg_1950017.tif'
         write_GeoTif_like(my_template, np_array, file_object)

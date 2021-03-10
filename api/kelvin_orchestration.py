@@ -7,6 +7,8 @@ import yaml
 import json
 import docker
 
+from log_logger import log_make_logger
+
 
 # python3 -m pip install -U PyYAML
 
@@ -35,43 +37,52 @@ class Kelvin:
         self.yml_file = yml_file
         self._read_yml()
         self.client = docker.from_env()
+        self.logger=log_make_logger('kelvin_o')
     
     def __repr__(self):
-        return(json.dumps(etm.etm_parms, indent=2))
+        return(json.dumps(self.kelvin_parms, indent=2))
         
     def _read_yml(self):
         print(self.yml_file)
         with open(self.yml_file) as file:
-            self.etm_parms = yaml.full_load(file)
+            self.kelvin_parms = yaml.full_load(file)
 
-    def MAIN_etm_runner(self):
-        products = self.etm_parms['products']
-        start_year = self.etm_parms['start_year']
-        end_year = self.etm_parms['end_year']
+    def MAIN_kelvin_runner(self):
+        products = self.kelvin_parms['products']
+        start_year = self.kelvin_parms['start_year']
+        end_year = self.kelvin_parms['end_year']
         for product in products:
             print(product)
             self._event_loop(start_year, end_year, product)
 
     def _start_container(self, docker_image, docker_full_cmd, name):
-        container = self.client.containers.run(docker_image, docker_full_cmd, detach=True, auto_remove=True, name=name)
-        # container = self.client.containers.run(docker_image, docker_full_cmd, detach=True, name=name)
-        print ( "CONTAINER is ", container.name)
-        return(container)
+        try:
+            # container = self.client.containers.run(docker_image, docker_full_cmd, detach=True, auto_remove=True, name=name)
+            container = self.client.containers.run(docker_image, docker_full_cmd, detach=True, name=name)
+            print ( "CONTAINER is ", container.name)
+            self.logger.info( f'starting CONTAINER is {container.name}')
+            return(container)
+        except:
+            self.logger.error( f'FAILED starting CONTAINER is {name}')
+            return('NULL')
 
-    def _start_etm(self, year, product):
+    def _start_kelvin(self, year, product):
     
         temperatureType=product
         cmd_opt =  ' -y ' + year + ' -t ' + temperatureType
         print(cmd_opt)
-        cmd = 'python3 api_etm.py '
+        cmd = 'python3 convert_kelvin_celsius.py '
         full_cmd = cmd + cmd_opt
         #print(full_cmd)
         docker_image =  "tbutzer/kelvin"
         #print(docker_image)
-        name_c = f'etmv1_{year}'
-        c = self._start_container(docker_image, full_cmd, name_c)
-        print("real name is", c.name, product)
-        print("==="*30)
+        name_c = f'kelvin_{year}_{product}'
+        try:
+            c = self._start_container(docker_image, full_cmd, name_c)
+            print("real name is", c.name, product)
+            print("==="*30)
+        except:
+            pass
 
     def _return_num_containers(self):
         client = self.client
@@ -83,14 +94,15 @@ class Kelvin:
 
     def _event_loop(self, year_to_process, end_year, product):
 
-        MAX_LOAD_LEVEL = self.etm_parms['max_cpu_percent']
-        MIN_MEMORY_AVAILABLE =  self.etm_parms['min_memory_available']
-        MAX_CONCURRENT_CONTAINERS = self.etm_parms['max_concurrent_containers']
+        MAX_LOAD_LEVEL = self.kelvin_parms['max_cpu_percent']
+        MIN_MEMORY_AVAILABLE =  self.kelvin_parms['min_memory_available']
+        MAX_CONCURRENT_CONTAINERS = self.kelvin_parms['max_concurrent_containers']
+        SLEEP_TIME=self.kelvin_parms['sleep_time']
 
         print(f' {year_to_process} <= {end_year}:')
         while year_to_process <= end_year:
-            print('sleeping for 30 .... ')
-            time.sleep(30)
+            print(f'sleeping for {SLEEP_TIME} .... ')
+            time.sleep(SLEEP_TIME)
 
             mem_avail = return_available_memory()
             cpu_load = return_cpu_load()
@@ -116,7 +128,7 @@ class Kelvin:
 
             if (mem and cpu and containers):
                 print("OK to Launch")
-                self._start_etm(str(year_to_process), product) ### start mosaic container
+                self._start_kelvin(str(year_to_process), product) ### start mosaic container
                 print("starting year", year_to_process)
                 year_to_process = year_to_process + 1
 

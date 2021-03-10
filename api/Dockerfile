@@ -1,7 +1,6 @@
 FROM python
 
 RUN pip install xarray \
-    && pip install xarray \
     && pip install boto3 \
     && pip install rioxarray \ 
     && pip install rasterio
