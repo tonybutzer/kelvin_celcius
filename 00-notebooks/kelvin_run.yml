@@ -1,0 +1,9 @@
+products: ['Tasavg','Tasmax', 'Tasmin']
+start_year: 1950
+end_year: 2019
+
+max_concurrent_containers: 64
+max_cpu_percent: 220
+min_memory_available: 4
+
+sleep_time: 2
